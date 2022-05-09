@@ -80,6 +80,119 @@ app.post("/sign-in", async (req, res) => {
   }
 });
 
+app.get("/transactions", async (req, res) => {
+  const { authorization } = req.headers;
+  let token = authorization?.replace("Bearer ", "");
+
+  if (!token) return res.sendStatus(401);
+
+  const session = await db.collection("sessions").findOne({ token });
+  if (!session) return res.sendStatus(401);
+
+  try {
+    const user = await db
+      .collection("users")
+      .findOne({ _id: ObjectId(session.user) });
+    if (!user) return res.sendStatus(401);
+
+    const transactions = await db
+      .collection("transactions")
+      .find({ user: user._id })
+      .toArray();
+
+    // let value = transactions.reduce((acc, curr) => {
+    //   return acc + curr.value;
+    // }, 0);
+
+    // //transformando o valor para moeda brl
+    // value = value.toLocaleString("pt-BR", {
+    //   style: "currency",
+    //   currency: "BRL",
+    // });
+    let value = 0;
+    let income = 0;
+    let outcome = 0;
+
+    transactions.forEach((transaction) => {
+      let realValue = transaction.value
+        .replace("R$", "")
+        .replace(",", ".")
+        .trim();
+
+      if (realValue.includes("-")) {
+        realValue = realValue.replace("-", "").trim();
+        outcome += Number(realValue);
+      } else {
+        income += Number(realValue);
+      }
+
+      realValue = Number(realValue);
+    });
+
+    value = income - outcome;
+
+    value = value.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+    const balance = {
+      inOut: income >= outcome ? "positive" : "negative",
+      value,
+    };
+
+    return res.status(200).send({ transactions, balance, name: user.name });
+  } catch (error) {
+    console.log(error);
+    return res.sendStatus(500);
+  }
+});
+
+app.post("/transactions", async (req, res) => {
+  const { authorization } = req.headers;
+  let { value, description, type } = req.body;
+
+  let token = authorization?.replace("Bearer ", "");
+
+  if (!token) return res.sendStatus(401);
+
+  const session = await db.collection("sessions").findOne({ token });
+  if (!session) return res.sendStatus(401);
+
+  try {
+    const user = await db
+      .collection("users")
+      .findOne({ _id: ObjectId(session.user) });
+    if (!user) return res.sendStatus(401);
+
+    const date = new Date().toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+
+    //transformando o valor para moeda brl
+    value = value.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+    const transaction = {
+      _id: new ObjectId(),
+      user: user._id,
+      value,
+      description,
+      date,
+      type,
+    };
+
+    await db.collection("transactions").insertOne(transaction);
+    return res.sendStatus(201);
+  } catch (error) {
+    console.log(error);
+    return res.sendStatus(500);
+  }
+});
+
 app.listen(process.env.PORTA, () => {
   console.log(
     chalk.bold.blue(`Server is running on port ${process.env.PORTA}`)
