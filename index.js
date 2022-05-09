@@ -27,28 +27,30 @@ conexao.catch((e) =>
 );
 
 app.post("/sign-up", async (req, res) => {
-  const cadastro = req.body;
-  const cadastroSchema = joi.object({
-    name: joi.string().required(),
+  const { username, email, password, repeatPassword } = req.body;
+
+  const signUpSchema = joi.object({
+    username: joi.string().required(),
     email: joi.string().email().required(),
     password: joi.string().required(),
+    repeatPassword: joi.string().required(),
   });
-  const { error } = cadastroSchema.validate(cadastro, { abortEarly: false });
-  if (error) {
-    res.status(422).send(error.details.map((detail) => detail.message));
-    return;
-  }
+
+  const validation = signUpSchema.validate({ username, email, password, repeatPassword });
+  
+  if (validation.error) return res.sendStatus(401);
 
   try {
-    const user = await db.collection("users").insertOne({
-      ...cadastro,
-      senha: bcrypt.hashSync(cadastro.password, 10),
-    });
-    console.log("Usuario cadastrado com sucesso", user);
-    res.sendStatus(201);
-  } catch (error) {
-    res.sendStatus(500);
-    console.log("Erro ao cadastrar usuario", error);
+    const user = await db.collection("users").findOne({email});
+    if(user) return res.sendStatus(401);
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+
+    await db.collection("users").insertOne({ username, email, password: passwordHash });
+    res.sendStatus(203);
+  } catch(e){
+    console.log(e);
+    res.sendStatus(401);
   }
 });
 
