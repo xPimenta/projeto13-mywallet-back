@@ -2,7 +2,7 @@ import dotenv from "dotenv"
 import {MongoClient} from "mongodb"
 dotenv.config()
 
-const mongoClient = new MongoClient("mongodb+srv://xpepper3:03031998@cluster0.fobgs.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
+const mongoClient = new MongoClient("MONGO_URI")
 let dataBase = null
 
 try{
