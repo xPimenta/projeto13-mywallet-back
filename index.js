@@ -37,7 +37,6 @@ app.post("/sign-up", async (req, res) => {
   });
 
   const validation = signUpSchema.validate({ username, email, password, repeatPassword });
-  
   if (validation.error) return res.sendStatus(401);
 
   try {
@@ -55,26 +54,25 @@ app.post("/sign-up", async (req, res) => {
 });
 
 app.post("/sign-in", async (req, res) => {
-  const login = req.body;
+  const { email, password } = req.body;
+
   const loginSchema = joi.object({
     email: joi.string().email().required(),
     password: joi.string().required(),
   });
-  const { error } = loginSchema.validate(login, { abortEarly: false });
-  if (error) {
-    res.status(402).send(error.details.map((detail) => detail.message));
-    return;
-  }
+
+  const validation = loginSchema.validate({ email, password });
+  if (validation.error) return res.sendStatus(401);
 
   try {
-    const user = await db.collection("users").findOne({ email: login.email });
-    if (usuario && bcrypt.compareSync(login.password, usuario.password)) {
+    const user = await db.collection("users").findOne({ email });
+    if (user && bcrypt.compareSync(password, user.password)) {
       const token = v4();
-      await db.collection("tokens").insertOne({
+      await db.collection("sessions").insertOne({
         token,
-        user: usuario._id,
+        user: user._id,
       });
-      res.status(200).send(token);
+      res.status(200).send({token});
     }
   } catch (error) {
     res.status(500).send(error.message);
